@@ -83,7 +83,7 @@ pipeline {
               expression { params.ENVIRONMENT == "PRODUCTION" }
             }            
             steps {
-                echo "This step deploys the project"
+                echo "This step deploys the project to ${params.ENVIRONMENT}"
             }
         }        
         stage('Report') {

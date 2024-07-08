@@ -1,29 +1,46 @@
 #!/bin/bash
 # vi: ft=bash
 
+
+# # redirect stdout and stderr to a log file
+# LOGFILE="/var/log/jenkins-startup.log"
+# exec > >(tee -a ${LOGFILE} )
+# exec 2> >(tee -a ${LOGFILE} >&2)
+
 echo "# $(date) Installation is starting."
+echo "Starting Jenkins setup..."
+
+# Add Jenkins repository for Ubuntu
+echo "Adding Jenkins repository..."
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+
+# Update and upgrade system
+echo "Updating package lists..."
+sudo apt-get update -y
+echo "Upgrading packages..."
+sudo apt-get upgrade -y
+
+
 
 # Uncomment the following line if you are using this script
 # as user data for an EC2 instance on AWS.
 # Output from the installation will be written to /var/log/user-data.log
-#exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
-echo "# $(date) Install jenkins key and package configuration..."
-curl -fsSL https://pkg.jenkins.io/debian/jenkins.io-2023.key | tee \
-    /usr/share/keyrings/jenkins-keyring.asc > /dev/null
 
-echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
-    https://pkg.jenkins.io/debian binary/ | tee \
-    /etc/apt/sources.list.d/jenkins.list > /dev/null
-
+# Install dependencies and Jenkins
 # install java, nginx, and jenkins
-echo "# $(date) Install Java 11, NGINX, and Jenkins..."
-apt update
+echo "Installing OpenJDK 17..."
+sudo apt-get install -y openjdk-17-jre
+echo "Installing Jenkins, Docker, and Git..."
+sudo apt-get install docker.io git nginx -y
+
+
+apt update -y
 apt-get -y upgrade
 
 apt-get -y install \
-    openjdk-11-jdk \
-    nginx \
     ca-certificates \
     curl \
     gnupg \
@@ -48,11 +65,10 @@ grep suggest platform-plugins.json | cut -d\" -f 4 | tee suggested-plugins.txt
 
 ## download the plugin installation tool
 echo "# $(date) Download the plugin installation tool"
-wget https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.12.3/jenkins-plugin-manager-2.12.3.jar
-
+wget https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.13.0/jenkins-plugin-manager-2.13.0.jar
 ## run the plugin installation tool
 echo "# $(date) Run the plugin installation tool..."
-/usr/bin/java -jar ./jenkins-plugin-manager-2.12.3.jar \
+/usr/bin/java -jar ./jenkins-plugin-manager-2.13.0.jar \
 	--verbose \
     --plugin-download-directory=/var/lib/jenkins/plugins \
     --plugin-file=./suggested-plugins.txt >> /var/log/plugin-installation.log
@@ -86,14 +102,15 @@ EOF
 echo "# $(date) Reload NGINX to pick up the new configuration..."
 systemctl reload nginx
 
-# install docker
-echo "# $(date) Install docker..."
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-    gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+# # install docker
+# echo "# $(date) Install docker..."
+# curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+#     gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu  $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+# echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu  $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-apt update
+# Install Docker
+echo "Installing Docker..."
 apt-get -y install docker-ce docker-ce-cli containerd.io
 docker run hello-world
 
